@@ -1,0 +1,20 @@
+{
+  "name": "lazy-memoize",
+  "version": "1.0.0",
+  "description": "",
+  "main": "build/lazy-memoize.js",
+  "scripts": {
+    "prepare": "tsc",
+    "test": "mocha --recursive build/test"
+  },
+  "types": "build/lazy-memoize",
+  "author": "Jarrad Whitaker <akdor1154@gmail.com>",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/mocha": "^2.2.41",
+    "@types/node": "^8.0.20",
+    "mocha": "^3.5.0",
+    "typescript": "^2.4.2"
+  },
+  "dependencies": {}
+}
