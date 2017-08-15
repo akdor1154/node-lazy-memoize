@@ -115,5 +115,27 @@ describe('cacher', () => {
         })
     });
 
+    describe('update lock', () => {
+        let i = 0;
+        let j = 0;
+        const f = async () => { 
+            i++;
+            await wait(5);
+            j++;
+        }
+
+        const c = cacher(f, 10 * 0.001);
+
+        it('should only run one update at a time', async () => {
+            await c(); // call once
+            await wait(20); // cache expire
+            await c(); // call again
+            await c(); // should not call again.
+            await wait(10);
+            assert.deepStrictEqual(i, 2);
+            assert.deepStrictEqual(j, 2);
+        })
+    })
+
 
 });

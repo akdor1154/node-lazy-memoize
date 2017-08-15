@@ -2,7 +2,7 @@
 interface MemoizationCache<T> {
     timestamp: number,
     result: undefined | T,
-    promise: undefined | Promise<T> | T,
+    promise: undefined | Promise<any>,
     initialized: boolean,
     error: Error | undefined
 }
@@ -20,26 +20,31 @@ function buildCacher<T>(_f: () => (Promise<T>|T), _maxAgeSeconds: number): () =>
 
     const _update = async function() {
         let result;
-        let promise;
+
         try {
-            promise = f();
-            cache.promise = promise;
-            result = await promise;
+            const result = await f();
             cache.error = undefined;
             cache.result = result;
         } catch (e) {
             cache.error = e;
             cache.result = undefined;
-        } finally {
-            cache.promise = undefined;
         }
+
         cache.timestamp = Date.now();
         cache.initialized = true;
     }
 
+    const _updateWithLock = function() {
+        if (cache.promise) {
+            return;
+        }
+
+        cache.promise = _update().then(() => {cache.promise = undefined});
+    }
+
     const r = async function() {
         if (Date.now() >= cache.timestamp + maxAgeMS || !cache.initialized) {
-            _update();
+            _updateWithLock();
         }
         if (!cache.initialized) {
             await cache.promise;
