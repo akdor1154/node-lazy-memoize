@@ -3,7 +3,8 @@ interface MemoizationCache<T> {
     timestamp: number,
     result: undefined | T,
     promise: undefined | Promise<T> | T,
-    initialized: boolean
+    initialized: boolean,
+    error: Error | undefined
 }
 
 function buildCacher<T>(_f: () => (Promise<T>|T), _maxAgeSeconds: number): () => Promise<T> {
@@ -13,7 +14,8 @@ function buildCacher<T>(_f: () => (Promise<T>|T), _maxAgeSeconds: number): () =>
         timestamp: -Infinity,
         result: undefined,
         promise: undefined,
-        initialized: false
+        initialized: false,
+        error: undefined
     };
 
     const _update = async function() {
@@ -23,23 +25,27 @@ function buildCacher<T>(_f: () => (Promise<T>|T), _maxAgeSeconds: number): () =>
             promise = f();
             cache.promise = promise;
             result = await promise;
+            cache.error = undefined;
+            cache.result = result;
         } catch (e) {
-            throw e;
+            cache.error = e;
+            cache.result = undefined;
         } finally {
             cache.promise = undefined;
         }
-        cache.initialized = true;
         cache.timestamp = Date.now();
-        cache.result = result;
+        cache.initialized = true;
     }
 
     const r = async function() {
-        if (Date.now() >= cache.timestamp + maxAgeMS) {
+        if (Date.now() >= cache.timestamp + maxAgeMS || !cache.initialized) {
             _update();
         }
         if (!cache.initialized) {
-            _update();
             await cache.promise;
+        }
+        if (cache.error) {
+            throw cache.error;
         }
         return cache.result!;
     }
