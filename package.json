@@ -17,6 +17,9 @@
     "mocha": "^3.5.0",
     "typescript": "^2.4.2"
   },
-  "url": "https://github.com/akdor1154/node-lazy-memoize",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/akdor1154/node-lazy-memoize"
+  },
   "dependencies": {}
 }
