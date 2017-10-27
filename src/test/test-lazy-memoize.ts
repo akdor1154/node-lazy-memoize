@@ -1,6 +1,8 @@
 import assert = require('assert');
 import assertThrows = require('assert-throws-async');
 import cacher = require('../lazy-memoize');
+import sms = require('source-map-support');
+sms.install();
 
 function wait(ms: number) {
     return new Promise((resolve, reject) => {
@@ -135,6 +137,39 @@ describe('cacher', () => {
             assert.deepStrictEqual(i, 2);
             assert.deepStrictEqual(j, 2);
         })
+    })
+
+    it('should work with a function that takes arguments', async () => {
+        let result1 = 42;
+        let result2 = -42;
+        const f = (x: Boolean) => (x) ? result1 : result2;
+        const cachedF = cacher(f, 100);
+        assert.strictEqual(await cachedF(true), 42);
+        assert.strictEqual(await cachedF(false), -42);
+        result1 = 1;
+        result2 = -2;
+        assert.strictEqual(await cachedF(true), 42);
+        assert.strictEqual(await cachedF(false), -42);
+    })
+
+    it('should work with a function that takes multi level arguments', async () => {
+        const callMap = new Map();
+
+        const f = async <A1 extends number, A2 extends number, A3 extends number>(n1: A1, n2: A2, n3: A3) => {
+            if (!callMap.has(n1)) { callMap.set(n1, new Map()) };
+            const callMap2 = callMap.get(n1);
+            if (!callMap2.has(n2)) { callMap2.set(n2, new Map()) };
+            const callMap3 = callMap2.get(n2);
+            const calls = (callMap3.get(n3) || 0 ) + 1;
+            callMap3.set(n3, calls);
+            return {value: n1 + n2 + n3, calls}
+        }
+
+        const cachedF = cacher(f, 0);
+        assert.deepStrictEqual(await cachedF(1, 2, 3), {value: 6, calls: 1});
+        assert.deepStrictEqual(await cachedF(1, 2, 3), {value: 6, calls: 1});
+        await wait(10);
+        assert.deepStrictEqual(await cachedF(1, 2, 3), {value: 6, calls: 2});
     })
 
 

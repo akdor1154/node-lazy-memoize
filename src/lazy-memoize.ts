@@ -58,4 +58,34 @@ function buildCacher<T>(_f: () => (Promise<T>|T), _maxAgeSeconds: number): () =>
     return r;
 }
 
-export = buildCacher;
+function createCacherFromArgs<R>(f: () => Promise<R> | R, maxAgeSeconds: number): () => Promise<R>;
+function createCacherFromArgs<R, A1>(f: (a: A1) => Promise<R> | R, maxAgeSeconds: number): (a1: A1) => Promise<R>;
+function createCacherFromArgs<R, A1, A2>(f: (a1: A1, a2: A2) => Promise<R> | R, maxAgeSeconds: number): (a1: A1, a2: A2) => Promise<R>;
+function createCacherFromArgs<R, A1, A2, A3>(f: (a1: A1, a2: A2, a3: A3) => Promise<R> | R, maxAgeSeconds: number): (a1: A1, a2: A2, a3: A3) => Promise<R>;
+function createCacherFromArgs<R, A1, A2, A3, A4>(f: (a1: A1, a2: A2, a3: A3, a4: A4) => Promise<R> | R, maxAgeSeconds: number): (a1: A1, a2: A2, a3: A3, a4: A4) => Promise<R>;
+function createCacherFromArgs<R, A1, A2, A3, A4, A5>(f: (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5) => Promise<R> | R, maxAgeSeconds: number): (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5) => Promise<R>;
+function createCacherFromArgs<R, A1, A2, A3, A4, A5, A6>(f: (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6) => Promise<R> | R, maxAgeSeconds: number): (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6) => Promise<R>;
+function createCacherFromArgs<R, A1, A2, A3, A4, A5, A6, A7>(f: (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6, a7: A7) => Promise<R> | R, maxAgeSeconds: number): (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6, a7: A7) => Promise<R>;
+function createCacherFromArgs<R, A1, A2, A3, A4, A5, A6, A7, A8>(f: (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6, a7: A7, a8: A8) => Promise<R> | R, maxAgeSeconds: number): (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6, a7: A7, a8: A8) => Promise<R>;
+function createCacherFromArgs<R>(f: (...args: any[]) => Promise<R> | R, maxAgeSeconds: number) {
+    const rootMap = new Map();
+    const rootCacher = buildCacher(() => f(), maxAgeSeconds);
+
+    return function(...args: any[]): Promise<R> {
+        const cacher: (() => Promise<R>) | Map<any, any> = args.reduce(
+            (currentMap: Map<any, Map<any, any> | (() => Promise<R>)>, nextArg, i) => {
+                if (!currentMap.has(nextArg)) {
+                    const mapValue = (i === args.length - 1)
+                        ? buildCacher(() => f(...args), maxAgeSeconds)
+                        : new Map();
+                    currentMap.set(nextArg, mapValue);
+                }
+                const nextMap = currentMap.get(nextArg)!;
+                return nextMap;
+            }, rootMap)
+
+        return (cacher === rootMap) ? rootCacher() : (cacher as () => Promise<R>)();
+    }
+}
+
+export = createCacherFromArgs;
