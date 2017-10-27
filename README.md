@@ -12,18 +12,18 @@ async function doSomethingSlow(arg) {
 	return arg+result;
 }
 
-const doSomethingSlowCached = cache(() => doSomethingSlow(123), 60);
+const doSomethingSlowCached = cache(doSomethingSlow, 60);
 
-const something = await doSomethingSlowCached(); //slow;
-const somethingAgain = await doSomethingSlowCached(); //fast;
+const something = await doSomethingSlowCached(123); //slow;
+const somethingAgain = await doSomethingSlowCached(123); //fast;
 // ..soon after 60 seconds
-const somethingNew = await doSomethingSlowCached(); // fast, and refreshed.
+const somethingNew = await doSomethingSlowCached(123); // fast, and refreshed.
 ```
 
 # Usage
 
 ```ts
-function<T> cache(f: () => Promise<T>|T, maxAgeSeconds: number): () => Promise<T>
+function<T> cache(f: (A1, A2, ...) => Promise<T>|T, maxAgeSeconds: number): (A1, A2, ...) => Promise<T>
 ```
 
 Builds a cacher for function `f`, which is invalidated and refreshed if called after `maxAgeSeconds` seconds. The cacher can then be called with no arguments, and returns the result of `f`.
