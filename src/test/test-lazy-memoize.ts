@@ -277,6 +277,7 @@ describe('with errors = swallow', () => {
 
         it('should preserve the previous result if a second call throws', async () => {
             enableThrow = true;
+            let result = undefined
             await new Promise(async (resolve, reject) => {
 
                 const listener = (e: Error) => {
@@ -287,13 +288,16 @@ describe('with errors = swallow', () => {
                 
                 c.on('error', listener);
 
-                assert.strictEqual(await c(), 1);
-                assert.strictEqual(calls, 2);
+                result = await c();
+            });
+
+            assert.strictEqual(result, 1);
+            assert.strictEqual(calls, 2);
                 
-            })
         });
         it('should preserve the previous result if a third call throws', async () => {
             enableThrow = true;
+            let result = undefined
             await new Promise(async (resolve, reject) => {
 
                 const listener = (e: Error) => {
@@ -303,11 +307,12 @@ describe('with errors = swallow', () => {
                 };
                 
                 c.on('error', listener);
+                result = await c();
+            });
 
-                assert.strictEqual(await c(), 1);
-                assert.strictEqual(calls, 3);
-                
-            })
+
+            assert.strictEqual(await result, 1);
+            assert.strictEqual(calls, 3);
         })
         it('should refresh the result if a fourth call succeeds', async () => {
             enableThrow = false;
