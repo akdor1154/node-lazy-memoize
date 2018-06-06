@@ -1,149 +1,156 @@
-
 interface MemoizationCache<T> {
-    timestamp: number,
-    result: undefined | T,
-    promise: undefined | Promise<any>,
-    initialized: boolean,
-    error: Error | undefined
+  timestamp: number;
+  result: undefined | T;
+  promise: undefined | Promise<any>;
+  initialized: boolean;
+  error: Error | undefined;
 }
 
 import events = require('events');
 
 const EventEmitter = events.EventEmitter;
-const eventEmitterProperties: {[k: string]: PropertyDescriptor} = {};
-for (const property in EventEmitter.prototype) {
-    eventEmitterProperties[property] = {
-        enumerable: false,
-        configurable: true,
-        value: (EventEmitter.prototype as any)[property]
-    }
-}
+const eventEmitterProperties = Object.getOwnPropertyDescriptors(
+  EventEmitter.prototype
+);
 
-for (const property of ["domain", "_events", "_maxListeners"]) {
-    eventEmitterProperties[property] = {
-        configurable: true,
-        writable: true,
-        value: undefined
-    };
-};
+function buildCacher<F extends () => Promise<any>>(
+  _f: F,
+  _maxAgeSeconds: number,
+  passedOptions: createCacherFromArgs.Options | undefined,
+  eventEmitter: events.EventEmitter
+): typeof _f {
+  const maxAgeMS = _maxAgeSeconds * 1000;
+  const f = _f;
+  const cache: MemoizationCache<UnPromise<ReturnType<typeof _f>>> = {
+    timestamp: -Infinity,
+    result: undefined,
+    promise: undefined,
+    initialized: false,
+    error: undefined
+  };
 
+  const options = Object.assign(
+    {
+      errors: 'passthrough'
+    } as createCacherFromArgs.Options,
+    passedOptions
+  );
 
-function buildCacher<T>(_f: () => (Promise<T>|T), _maxAgeSeconds: number, passedOptions: createCacherFromArgs.Options | undefined, eventEmitter: events.EventEmitter): () => Promise<T> {
-    const maxAgeMS = _maxAgeSeconds * 1000;
-    const f = _f;
-    const cache: MemoizationCache<T> = {
-        timestamp: -Infinity,
-        result: undefined,
-        promise: undefined,
-        initialized: false,
-        error: undefined
-    };
+  const _update =
+    options.errors === 'passthrough'
+      ? async function() {
+          try {
+            const result = await f();
+            cache.error = undefined;
+            cache.result = result;
+          } catch (e) {
+            cache.error = e;
+            cache.result = undefined;
+          }
 
-    const options = Object.assign({
-        errors: 'passthrough',
-    } as createCacherFromArgs.Options, passedOptions);
-
-    const _update = (options.errors === 'passthrough')
-        ? async function() {
-            try {
-                const result = await f();
-                cache.error = undefined;
-                cache.result = result;
-            } catch (e) {
-                cache.error = e;
-                cache.result = undefined;
-            }
-
+          cache.timestamp = Date.now();
+          cache.initialized = true;
+        }
+      : async function() {
+          try {
+            const result = await f();
+            cache.error = undefined;
+            cache.result = result;
             cache.timestamp = Date.now();
             cache.initialized = true;
-        }
-        : async function() {
-            try {
-                const result = await f();
-                cache.error = undefined;
-                cache.result = result;
-                cache.timestamp = Date.now();
-                cache.initialized = true;
-            } catch (e) {
-                // todo: emit error.
-                if (!cache.initialized) {
-                    cache.error = e;
-                }
-                eventEmitter.emit('error', e);
+          } catch (e) {
+            // todo: emit error.
+            if (!cache.initialized) {
+              cache.error = e;
             }
-        }
+            eventEmitter.emit('error', e);
+          }
+        };
 
-    const _updateWithLock = function() {
-        if (cache.promise) {
-            return;
-        }
-        let savedE: Error | undefined;
-        cache.promise = _update()
-        .catch( (e) => {savedE = e} )
-        .then(() => {
-            cache.promise = undefined
-            if (savedE) {
-                throw savedE;
-            }
-        });
+  const _updateWithLock = function() {
+    if (cache.promise) {
+      return;
     }
+    let savedE: Error | undefined;
+    cache.promise = _update()
+      .catch(e => {
+        savedE = e;
+      })
+      .then(() => {
+        cache.promise = undefined;
+        if (savedE) {
+          throw savedE;
+        }
+      });
+  };
 
-    const r = async function() {
-        if (Date.now() >= cache.timestamp + maxAgeMS || !cache.initialized) {
-            _updateWithLock();
-        }
-        if (!cache.initialized) {
-            await cache.promise;
-        }
-        if (cache.error) {
-            throw cache.error;
-        }
-        return cache.result!;
-    };
+  const r = async function() {
+    if (Date.now() >= cache.timestamp + maxAgeMS || !cache.initialized) {
+      _updateWithLock();
+    }
+    if (!cache.initialized) {
+      await cache.promise;
+    }
+    if (cache.error) {
+      throw cache.error;
+    }
+    return cache.result!;
+  };
 
-    return r;
+  return r as typeof _f;
 }
 
+type UnPromise<T> = T extends Promise<infer R> ? R : any;
 
-function createCacherFromArgs<R>(f: () => Promise<R> | R, maxAgeSeconds: number, options?: createCacherFromArgs.Options): (() => Promise<R>) & events.EventEmitter;
-function createCacherFromArgs<R, A1>(f: (a: A1) => Promise<R> | R, maxAgeSeconds: number, options?: createCacherFromArgs.Options): ((a1: A1) => Promise<R>) & events.EventEmitter;
-function createCacherFromArgs<R, A1, A2>(f: (a1: A1, a2: A2) => Promise<R> | R, maxAgeSeconds: number, options?: createCacherFromArgs.Options): ((a1: A1, a2: A2) => Promise<R>) & events.EventEmitter;
-function createCacherFromArgs<R, A1, A2, A3>(f: (a1: A1, a2: A2, a3: A3) => Promise<R> | R, maxAgeSeconds: number, options?: createCacherFromArgs.Options): ((a1: A1, a2: A2, a3: A3) => Promise<R>) & events.EventEmitter;
-function createCacherFromArgs<R, A1, A2, A3, A4>(f: (a1: A1, a2: A2, a3: A3, a4: A4) => Promise<R> | R, maxAgeSeconds: number, options?: createCacherFromArgs.Options): ((a1: A1, a2: A2, a3: A3, a4: A4) => Promise<R>) & events.EventEmitter;
-function createCacherFromArgs<R, A1, A2, A3, A4, A5>(f: (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5) => Promise<R> | R, maxAgeSeconds: number, options?: createCacherFromArgs.Options): ((a1: A1, a2: A2, a3: A3, a4: A4, a5: A5) => Promise<R>) & events.EventEmitter;
-function createCacherFromArgs<R, A1, A2, A3, A4, A5, A6>(f: (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6) => Promise<R> | R, maxAgeSeconds: number, options?: createCacherFromArgs.Options): ((a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6) => Promise<R>) & events.EventEmitter;
-function createCacherFromArgs<R, A1, A2, A3, A4, A5, A6, A7>(f: (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6, a7: A7) => Promise<R> | R, maxAgeSeconds: number, options?: createCacherFromArgs.Options): ((a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6, a7: A7) => Promise<R>) & events.EventEmitter;
-function createCacherFromArgs<R, A1, A2, A3, A4, A5, A6, A7, A8>(f: (a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6, a7: A7, a8: A8) => Promise<R> | R, maxAgeSeconds: number, options?: createCacherFromArgs.Options): ((a1: A1, a2: A2, a3: A3, a4: A4, a5: A5, a6: A6, a7: A7, a8: A8) => Promise<R>) & events.EventEmitter;
-function createCacherFromArgs<R>(f: (...args: any[]) => Promise<R> | R, maxAgeSeconds: number, options?: createCacherFromArgs.Options) {
-    const rootMap = new Map();
-    const aggregateCacher = function(...args: any[]): Promise<R> {
-        const cacher: (() => Promise<R>) | Map<any, any> = args.reduce(
-            (currentMap: Map<any, Map<any, any> | (() => Promise<R>)>, nextArg, i) => {
-                if (!currentMap.has(nextArg)) {
-                    const mapValue = (i === args.length - 1)
-                        ? buildCacher(() => f(...args), maxAgeSeconds, options, aggregateCacher)
-                        : new Map();
-                    currentMap.set(nextArg, mapValue);
-                }
-                const nextMap = currentMap.get(nextArg)!;
-                return nextMap;
-            }, rootMap)
+function createCacherFromArgs<F extends (...args: any[]) => Promise<any>>(
+  f: F,
+  maxAgeSeconds: number,
+  options?: createCacherFromArgs.Options
+): typeof f & events.EventEmitter {
+  const rootMap = new Map();
+  const aggregateCacher = function(...args: any[]): Promise<any> {
+    const cacher: (() => Promise<any>) | Map<any, any> = args.reduce(
+      (
+        currentMap: Map<any, Map<any, any> | (() => Promise<any>)>,
+        nextArg,
+        i
+      ) => {
+        if (!currentMap.has(nextArg)) {
+          const mapValue =
+            i === args.length - 1
+              ? buildCacher(
+                  () => f(...args),
+                  maxAgeSeconds,
+                  options,
+                  aggregateCacher
+                )
+              : new Map();
+          currentMap.set(nextArg, mapValue);
+        }
+        const nextMap = currentMap.get(nextArg)!;
+        return nextMap;
+      },
+      rootMap
+    );
 
-        return (cacher === rootMap) ? rootCacher() : (cacher as () => Promise<R>)();
-    } as ((...args: any[]) => Promise<R>) & events.EventEmitter;
-    Object.defineProperties(aggregateCacher, eventEmitterProperties);
-    EventEmitter.call(aggregateCacher);
+    return cacher === rootMap ? rootCacher() : (cacher as () => Promise<any>)();
+  } as (typeof f) & events.EventEmitter;
+  Object.defineProperties(aggregateCacher, eventEmitterProperties);
+  EventEmitter.call(aggregateCacher);
 
-    const rootCacher = buildCacher(() => f(), maxAgeSeconds, options, aggregateCacher);
+  const rootCacher = buildCacher(
+    () => f(),
+    maxAgeSeconds,
+    options,
+    aggregateCacher
+  );
 
-    return aggregateCacher;
-
+  return aggregateCacher;
 }
 namespace createCacherFromArgs {
-    export interface Options {
-        errors : 'passthrough' | 'swallow'
-    };
+  export interface Options {
+    errors: 'passthrough' | 'swallow';
+  }
 }
-
 
 export = createCacherFromArgs;

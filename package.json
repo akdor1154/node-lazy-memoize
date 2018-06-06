@@ -11,17 +11,19 @@
   "author": "Jarrad Whitaker <akdor1154@gmail.com>",
   "license": "ISC",
   "devDependencies": {
-    "@types/mocha": "^2.2.44",
-    "@types/node": "^8.0.47",
-    "@types/source-map-support": "^0.4.0",
-    "assert-throws-async": "^2.0.1",
-    "mocha": "^4.0.1",
-    "source-map-support": "^0.5.0",
-    "typescript": "^2.5.3"
+    "@types/mocha": "^5.2.1",
+    "@types/node": "^10.3.1",
+    "@types/source-map-support": "^0.4.1",
+    "mocha": "^5.2.0",
+    "source-map-support": "^0.5.6",
+    "typescript": "^2.9.1"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/akdor1154/node-lazy-memoize"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "engines": {
+    "node": ">= 8"
+  }
 }
