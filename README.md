@@ -23,10 +23,22 @@ const somethingNew = await doSomethingSlowCached(123); // fast, and refreshed.
 # Usage
 
 ```ts
-function<T> cache(f: (A1, A2, ...) => Promise<T>, maxAgeSeconds: number, options?: Options): ((A1, A2, ...) => Promise<T>) & EventEmitter
+interface Cache extends EventEmitter {
+	invalidate: () => Promise<void>
+}
+```
+```ts
+function<T> cache(f: (A1, A2, ...) => Promise<T>, maxAgeSeconds: number, options?: Options): (typeof f) & Cache
 ```
 
 Builds a cacher for function `f`, which is invalidated and refreshed if called after `maxAgeSeconds` seconds. The cacher can then be called with no arguments, and returns the result of `f`.
+
+```ts
+cachedFunction.invalidate() : Promise<void>
+```
+
+Invalidates the cache so future calls will result in the function being re-evaluated.
+
 
 ## Options
 
