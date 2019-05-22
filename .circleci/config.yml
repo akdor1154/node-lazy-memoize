@@ -100,6 +100,12 @@ workflows:
               only: /.*/
             branches:
               ignore: /.*/
+      - node12:
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              ignore: /.*/
       - publish:
           requires:
             - node8
