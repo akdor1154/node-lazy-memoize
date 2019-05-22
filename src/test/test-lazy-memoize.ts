@@ -278,3 +278,24 @@ describe('with errors = swallow', () => {
     });
   });
 });
+
+describe('invalidation', () => {
+  it('should invalidate the cache as expected', async () => {
+      let result1 = 42;
+      let result2 = -42;
+      const f = async (x: Boolean) => (x ? result1 : result2);
+      const cachedF = cacher(f, 100);
+      assert.strictEqual(await cachedF(true), 42);
+      assert.strictEqual(await cachedF(false), -42);
+
+      result1 = 1;
+      result2 = -2;
+      assert.strictEqual(await cachedF(true), 42);
+      assert.strictEqual(await cachedF(false), -42);
+
+      cachedF.invalidate();
+      assert.strictEqual(await cachedF(true), 1);
+      assert.strictEqual(await cachedF(false), -2);
+
+  })
+})
