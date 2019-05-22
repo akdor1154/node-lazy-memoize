@@ -42,6 +42,25 @@ jobs:
 
       - run: npm test
 
+  node12:
+    <<: *defaults
+
+    docker:
+      - image: circleci/node:12
+    steps:
+      - checkout
+
+      - restore_cache:
+          key: node12-v1-{{checksum "package-lock.json"}}-{{checksum "tsconfig.json"}}-{{arch}}
+      - run: npm ci
+      - save_cache:
+          key: node12-v1-{{checksum "package-lock.json"}}-{{checksum "tsconfig.json"}}-{{arch}}
+          paths:
+            - node_modules
+            - build
+
+      - run: npm test
+
       - persist_to_workspace:
           root: ~/repo
           paths: .
@@ -66,6 +85,7 @@ workflows:
     jobs:
       - node8
       - node10
+      - node12
   publish:
     jobs:
       - node8:
@@ -84,6 +104,7 @@ workflows:
           requires:
             - node8
             - node10
+            - node12
           filters:
             tags:
               only: /^v.*/
